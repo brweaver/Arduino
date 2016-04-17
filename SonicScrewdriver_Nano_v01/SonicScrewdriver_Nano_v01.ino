@@ -8,10 +8,10 @@
 
 #include "pitches.h"
 
-int const SPEAKER_PIN = 7;
-int const SWITCH_PIN = 12;
+int const SPEAKER_PIN = 5;
+int const SWITCH_PIN = 4;
 
-int RGB_LED[] = { 10, 9, 8 };
+int RGB_LED[] = { 7, 8, 9 };
 int numLEDs = 3;
 
 int melody[] = {
