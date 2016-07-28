@@ -3,6 +3,10 @@
 #include <Wire.h>
 #include <Zumo32U4.h>
 
+#define NUM_SENSORS 3
+#define MOVING_AVG 10
+#define SENSOR_THRESHOLD 500
+
 Zumo32U4Motors motors;
 Zumo32U4ButtonA buttonA;
 Zumo32U4ButtonB buttonB;
@@ -15,68 +19,77 @@ Zumo32U4LineSensors lineSensors;
 
 Robot robot;
 
-const bool shouldPrintProxSensorResults = false;
-
-#define NUM_SENSORS 5
 unsigned int lineSensorValues[NUM_SENSORS];
+unsigned int lineSensorValuesAvg[NUM_SENSORS];
+unsigned int lineSensorMovingAvg[MOVING_AVG][NUM_SENSORS];
+unsigned int movAvgIndex = 0;
 
 void setup() {
-  // put your setup code here, to run once:
-  lcd.clear();
-  lcd.print(">");
 
-  ledRed(1);
-  delay(500);
+  // if analog input pin 0 is unconnected, random analog
+  // noise will cause the call to randomSeed() to generate
+  // different seed numbers each time the sketch runs.
+  // randomSeed() will then shuffle the random function.
+  randomSeed(analogRead(0));
 
-  ledRed(0);
-  ledYellow(1);
-  lcd.print(">");
-  delay(500);
-
-  ledRed(0);
-  ledYellow(0);
-  ledGreen(1);
-  lcd.print(">");
+  if (NUM_SENSORS==3) {
+    lineSensors.initThreeSensors();
+  } else {
+    lineSensors.initFiveSensors();
+  }
 
   proxSensors.initThreeSensors();
-
-  // Reset defaults:
   proxSensors.setPulseOnTimeUs(457); // default is 421; changing for the hell of it
   proxSensors.setPulseOffTimeUs(330); // per http://pololu.github.io/zumo-32u4-arduino-library/class_zumo32_u4_proximity_sensors.html#a6d47a41b45a7088916fbeaa5b38c60b3
+
+  //openingAnimation();
+  waitForButtonA();
+
+  buzzer.play(">g32>>c32");
+  //delay(5000);
+
+  robot.forward();
+  
+  //robot.taanabManeuver();
 }
 
 void loop() {
   
+  // Respond to prox result
   ProxResult proxResult = readProxSensorsSimple();
-  
-  Serial.print(" proxResult: ");
-  Serial.println(proxResultToString(proxResult));
+//  Serial.print(" proxResult: ");
+//  Serial.println(proxResultToString(proxResult));
 
+  
   switch (proxResult) {
     case Confused:
     case Nothing:
+    default:
       lcd.clear();
       lcd.gotoXY(0, 1);
       lcd.print("No Target");
-      robot.deadStop();
+      robot.forward();
       break;
     case AheadQuarter:
       lcd.clear();
       lcd.gotoXY(3, 1);
       lcd.print("A");
-      robot.deadStop();
+      // this needs to change
+      // ram the thing
+      robot.forward();
       break;
     case AheadHalf:
       lcd.clear();
       lcd.gotoXY(3, 1);
       lcd.print("^");
-      robot.deadStop();
+      // move forward
+      robot.forward();
       break;
     case AheadFull:
       lcd.clear();
       lcd.gotoXY(3, 1);
       lcd.print("|");
-      robot.deadStop();
+      robot.forward();
       break;
     case Left:
       lcd.clear();
@@ -102,6 +115,41 @@ void loop() {
       lcd.print(">");
       robot.nudgeRight();
       break;
+  }
+
+  LineResult lineResult = readLineSensorSimple();
+ 
+  switch (lineResult) {
+    case Miss:
+      lcd.gotoXY(1, 0);
+      lcd.print("no");
+      break; 
+    case HitCenter:
+      lcd.gotoXY(1, 0);
+      lcd.print("HC");
+      robot.backupManeuver();
+      break;
+    case HitLeft:
+      lcd.gotoXY(1, 0);
+      lcd.print("HL");
+      robot.turnRight(Robot::TURN_DELAY_90);
+      break;
+    case HitLeftCenter:
+      lcd.gotoXY(1, 0);
+      lcd.print("CL");
+      robot.turnRight(Robot::TURN_DELAY_180);
+      break;
+    case HitRight:
+      lcd.gotoXY(1, 0);
+      lcd.print("HR");
+      robot.turnLeft(Robot::TURN_DELAY_90);
+      break;
+    case HitRightCenter:
+      lcd.gotoXY(1, 0);
+      lcd.print("CR");
+      robot.turnLeft(Robot::TURN_DELAY_180);
+      break;
+    
   }
 
   robot.refresh();
@@ -141,6 +189,42 @@ String proxResultToString(ProxResult r) {
   }
 }
 
+LineResult readLineSensorSimple() {
+  lineSensors.read(lineSensorValues);
+  updateMovingAvg(lineSensorValues);
+
+//  Serial.print("Values: ");
+//  for (int i = 0; i < NUM_SENSORS; i++) {
+//    Serial.print(lineSensorValues[i]);
+//    Serial.print(" ");
+//  }
+//  Serial.print(" avg: ");
+//  for (int i = 0; i < NUM_SENSORS; i++) {
+//    Serial.print(lineSensorValuesAvg[i] / MOVING_AVG);
+//    Serial.print(" ");
+//  }
+//  Serial.println("");
+
+  bool leftHit = lineSensorHit(0);
+  bool centerHit = lineSensorHit(1);
+  bool rightHit = lineSensorHit(2);
+
+  if (leftHit && centerHit && rightHit) return HitCenter;
+  else if (leftHit && centerHit) return HitLeftCenter;
+  else if (rightHit && centerHit) return HitRightCenter;
+  else if (centerHit) return HitCenter;
+  else if (leftHit) return HitLeft;
+  else if (rightHit) return HitRight;
+  
+  return Miss;
+}
+
+bool lineSensorHit(int sensorIndex) {
+  if (lineSensorValues[sensorIndex] < SENSOR_THRESHOLD) return true;
+  //if (lineSensorValues[sensorIndex] < lineSensorValuesAvg[sensorIndex]*1.1) return true;
+  return false;
+}
+
 ProxResult readProxSensorsSimple() {
   uint16_t minIRBrightness = 2; 
   uint16_t maxIRBrightness = 410; // 418 is the empirical max, but it's not always triggered. 
@@ -168,10 +252,10 @@ ProxResult readProxSensorsSimple() {
 
   int diffFrontSignal = sumLeftLED[1] - sumRightLED[1]; 
 
-  Serial.print("Left: ");
-  printProxSensorResults(sumLeftLED);
-  Serial.print(" Right: ");
-  printProxSensorResults(sumRightLED);
+//  Serial.print("Left: ");
+//  printProxSensorResults(sumLeftLED);
+//  Serial.print(" Right: ");
+//  printProxSensorResults(sumRightLED);
   
   // 90% 1/4
   // 80% 1/2 means (roughly) midcircle
@@ -181,16 +265,16 @@ ProxResult readProxSensorsSimple() {
 
   if (sumLeftLED[1] >= strongSignal && sumRightLED[1] >= strongSignal) {
       return AheadQuarter;
+  } else if (sumRightLED[2] >= modSignal) {
+    return Right;
+  } else if (sumLeftLED[0] >= modSignal) {
+    return Left;
   } else if (sumLeftLED[1] >= modSignal && sumRightLED[1] >= modSignal && abs(diffFrontSignal) < weakSignal) {
       return AheadHalf;
   } else if (diffFrontSignal > weakSignal) {
     return NudgeLeft;
   } else if (diffFrontSignal < -weakSignal) {
     return NudgeRight;
-  } else if (sumLeftLED[0] >= modSignal) {
-    return Left;
-  } else if (sumRightLED[2] >= modSignal) {
-    return Right;
   } else if (sumLeftLED[1] >= weakSignal && sumRightLED[1] >= weakSignal) {
     return AheadFull;
   }
@@ -215,139 +299,44 @@ void deriveExponentialBrightnessLevels(uint16_t min, uint16_t max, uint16_t coun
   }
 }
 
-void calibrateLineSensors()
-{
+void openingAnimation() {
   lcd.clear();
+  lcd.print(">");
 
-  // Wait 1 second and then begin automatic sensor calibration
-  // by rotating in place to sweep the sensors over the line
-  delay(1000);
-  for(uint16_t i = 0; i < 120; i++)
-  {
-    if (i > 30 && i <= 90)
-    {
-      motors.setSpeeds(-200, 200);
-    }
-    else
-    {
-      motors.setSpeeds(200, -200);
-    }
+  ledRed(1);
+  delay(500);
 
-    lineSensors.calibrate();
-  }
-  motors.setSpeeds(0, 0);
+  ledRed(0);
+  ledYellow(1);
+  lcd.print(">");
+  delay(500);
+
+  ledRed(0);
+  ledYellow(0);
+  ledGreen(1);
+  lcd.print(">");
 }
 
+void waitForButtonA() {
+  lcd.clear();
+  lcd.print(F("Press A"));
+  lcd.gotoXY(0, 1);
+  buttonA.waitForButton();
+  lcd.clear();
+}
 
-void loop_old() {
-
-  // Notes: 
-  // Roughly two milliseconds per brightness level. 
-
-  unsigned long StartTime = micros();
-  proxSensors.read();
-  unsigned long CurrentTime = micros();
-  unsigned long ElapsedTime = CurrentTime - StartTime;
-
+void updateMovingAvg(unsigned int *values) {
+  unsigned int i;
   
-  Serial.println("");
-  Serial.print("Elapsed Time: ");
-  Serial.println(ElapsedTime);
-  Serial.print("Number of Brightness Levels: ");
-  Serial.println(proxSensors.getNumBrightnessLevels());
-  Serial.println("");
-  Serial.print("Basic Left: ");
-  Serial.println(proxSensors.readBasicLeft());
-  Serial.print("Basic Right: ");
-  Serial.println(proxSensors.readBasicRight());
-  Serial.print("Basic Front: ");
-  Serial.println(proxSensors.readBasicFront());
-  Serial.println("");
-  Serial.print("Front w/Left: ");
-  Serial.println(proxSensors.countsFrontWithLeftLeds());
-  Serial.print("Front w/Right: ");
-  Serial.println(proxSensors.countsFrontWithRightLeds());
-  Serial.print("Left w/Left: ");
-  Serial.println(proxSensors.countsLeftWithLeftLeds());
-  Serial.print("Left w/Right: ");
-  Serial.println(proxSensors.countsLeftWithRightLeds());
-  Serial.print("Right w/Right: ");
-  Serial.println(proxSensors.countsRightWithRightLeds());
-  Serial.print("Right w/Left: ");
-  Serial.println(proxSensors.countsRightWithLeftLeds());
-  
-  while (!buttonA.getSingleDebouncedRelease()) {
-    delay(50);
-
-    if (buttonC.getSingleDebouncedRelease()) {
-
-      calibrateProxSensors();
-      
-      //uint16_t brightnessLevels[] = { 4, 15, 32, 55, 85, 120 };
-      //uint16_t brightnessLevels[] = { 2, 4, 8, 16, 32, 64, 128, 256, 512, 1012 };
-      //proxSensors.setBrightnessLevels(brightnessLevels, 10);
-      //Serial.println("Set new brightness levels.");
-    }
+  for (i = 0; i < NUM_SENSORS; i++) {
+    lineSensorValuesAvg[i] -= lineSensorMovingAvg[movAvgIndex][i];
+    lineSensorMovingAvg[movAvgIndex][i] = values[i];
+    lineSensorValuesAvg[i] += lineSensorMovingAvg[movAvgIndex][i];
   }
 
-  
-
-  
-  if (proxSensors.countsFrontWithLeftLeds() >= 2
-        || proxSensors.countsFrontWithRightLeds() >= 2)
-      {
-        lcd.clear();
-        lcd.gotoXY(3, 1);
-        lcd.print("^");
-      }
-
-  else if (proxSensors.countsLeftWithLeftLeds() >= 2)
-      {
-        // Detected something to the left.
-        lcd.clear();
-        lcd.gotoXY(0, 1);
-        lcd.print("<");
-      }
-
-  else if (proxSensors.countsRightWithRightLeds() >= 2)
-      {
-        // Detected something to the right.
-        lcd.clear();
-        lcd.gotoXY(5, 1);
-        lcd.print(">");
-      }
-      
-//   else {
-//    uint8_t sum = proxSensors.countsFrontWithRightLeds() + proxSensors.countsFrontWithLeftLeds();
-//    int8_t diff = proxSensors.countsFrontWithRightLeds() - proxSensors.countsFrontWithLeftLeds();
-//if (sum == 0)
-//   }
-   
-  
-  if (buttonB.isPressed())
-  {
-    // Whenever the button is pressed, turn on the yellow LED.
-    ledYellow(1);
-  }
-  else
-  {
-    // Whenever the button is not pressed, turn off the yellow
-    // LED.
-    ledYellow(0);
-  }
-
-  static int cPressedCount = 0;
-  if (buttonC.getSingleDebouncedPress())
-  {
-    cPressedCount += 1;
-    Serial.print(F("Button C was pressed "));
-    Serial.print(cPressedCount);
-    Serial.println(F(" times."));
-    // Start playing a tone with frequency 440 Hz at maximum
-    // volume (15) for 200 milliseconds.
-    buzzer.playFrequency(440, 200, 15);
-    
-    lcd.clear();
-    lcd.print(cPressedCount);
+  movAvgIndex += 1;
+  if (movAvgIndex >= MOVING_AVG) {
+    movAvgIndex = 0;
   }
 }
+

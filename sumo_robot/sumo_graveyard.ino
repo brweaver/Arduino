@@ -1,4 +1,6 @@
 
+
+
 ProxResult readProxSensors() {
 
   proxSensors.pullupsOn();
@@ -57,15 +59,15 @@ ProxResult readProxSensors() {
     Zumo32U4IRPulses::stop();
     delayMicroseconds(pulseOffTimeUs);
 
-    if (shouldPrintProxSensorResults) {
-        Serial.print(" LeftLED: "); 
-        printProxSensorResults(leftLED[b]);    
-        Serial.print(" RightLED: ");
-        printProxSensorResults(rightLED[b]);
-        Serial.print("   Brightness: ");
-        Serial.print(brightness);
-        Serial.println("");
-    }
+//    if (shouldPrintProxSensorResults) {
+//        Serial.print(" LeftLED: "); 
+//        printProxSensorResults(leftLED[b]);    
+//        Serial.print(" RightLED: ");
+//        printProxSensorResults(rightLED[b]);
+//        Serial.print("   Brightness: ");
+//        Serial.print(brightness);
+//        Serial.println("");
+//    }
     
   }
 
@@ -82,14 +84,14 @@ ProxResult readProxSensors() {
     }
   }
 
-  if (shouldPrintProxSensorResults) {
-    Serial.print("SUM -- ");
-    Serial.print("LeftLED: ");
-    printProxSensorResults(sumLeftLED);    
-    Serial.print(" RightLED: ");
-    printProxSensorResults(sumRightLED);    
-    Serial.println("");
-  }
+//  if (shouldPrintProxSensorResults) {
+//    Serial.print("SUM -- ");
+//    Serial.print("LeftLED: ");
+//    printProxSensorResults(sumLeftLED);    
+//    Serial.print(" RightLED: ");
+//    printProxSensorResults(sumRightLED);    
+//    Serial.println("");
+//  }
 
   // 
   const int strongSignal = numBrightnessLevels * 0.9;

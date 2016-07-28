@@ -22,13 +22,23 @@
 
   public:
     Robot() {}
+
+    static const unsigned long TURN_DELAY_90 = 200; //160?
+    static const unsigned long TURN_DELAY_180 = 400;
+
+    RobotState currentState;
     
     // Basic Operations
+    void forward();
     void turnLeft();
     void turnRight();
+    void turnLeft(unsigned long delay);
+    void turnRight(unsigned long delay);
     void nudgeLeft();
     void nudgeRight();
     void deadStop();
+    void taanabManeuver();
+    void backupManeuver();
     void refresh();
     RobotState state();
     
@@ -39,6 +49,8 @@
     
     static const uint16_t maxSpeed = 1024;
     static const unsigned long defaultDelay = 20; // ms
+    
+    int16_t speed = 400;
 
     Zumo32U4Motors motors;
     
@@ -46,7 +58,7 @@
     unsigned long stateInitTime;
     unsigned long stateDelayTime;
 
-    RobotState currentState;
+    
 
     
 //    typedef struct Movement {

@@ -10,3 +10,14 @@ enum ProxResult
   Nothing,
   Confused
 };
+
+enum LineResult
+{
+  HitCenter,
+  HitLeft,
+  HitLeftCenter,
+  HitRight,
+  HitRightCenter,
+  Miss
+};
+
