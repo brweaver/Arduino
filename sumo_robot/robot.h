@@ -21,10 +21,11 @@
     };
 
   public:
-    Robot() {}
+    Robot();
 
     static const unsigned long TURN_DELAY_90 = 200; //160?
     static const unsigned long TURN_DELAY_180 = 400;
+    static constexpr float NUDGE_REDUCTION = 0.5;
 
     RobotState currentState;
     
@@ -46,6 +47,7 @@
 
     void resetDefaultDelay();
     void resetDelay(int);
+    bool randomBool();
     
     static const uint16_t maxSpeed = 1024;
     static const unsigned long defaultDelay = 20; // ms

@@ -3,6 +3,9 @@
 #include <Wire.h>
 #include <Zumo32U4.h>
 
+#define PRINT_LINE_SENSOR_DATA false
+#define PRINT_PROX_SENSOR_DATA false
+
 #define NUM_SENSORS 3
 #define MOVING_AVG 10
 #define SENSOR_THRESHOLD 500
@@ -26,11 +29,7 @@ unsigned int movAvgIndex = 0;
 
 void setup() {
 
-  // if analog input pin 0 is unconnected, random analog
-  // noise will cause the call to randomSeed() to generate
-  // different seed numbers each time the sketch runs.
-  // randomSeed() will then shuffle the random function.
-  randomSeed(analogRead(0));
+  randomSeed(millis());
 
   if (NUM_SENSORS==3) {
     lineSensors.initThreeSensors();
@@ -46,21 +45,19 @@ void setup() {
   waitForButtonA();
 
   buzzer.play(">g32>>c32");
-  //delay(5000);
-
-  robot.forward();
   
-  //robot.taanabManeuver();
+  // Delay 5-seconds!
+  delay(5000);
+
+//  robot.forward();
+  
+  robot.taanabManeuver();
 }
 
 void loop() {
   
   // Respond to prox result
-  ProxResult proxResult = readProxSensorsSimple();
-//  Serial.print(" proxResult: ");
-//  Serial.println(proxResultToString(proxResult));
-
-  
+  ProxResult proxResult = readProxSensorsSimple();  
   switch (proxResult) {
     case Confused:
     case Nothing:
@@ -74,8 +71,6 @@ void loop() {
       lcd.clear();
       lcd.gotoXY(3, 1);
       lcd.print("A");
-      // this needs to change
-      // ram the thing
       robot.forward();
       break;
     case AheadHalf:
@@ -118,7 +113,6 @@ void loop() {
   }
 
   LineResult lineResult = readLineSensorSimple();
- 
   switch (lineResult) {
     case Miss:
       lcd.gotoXY(1, 0);
@@ -155,17 +149,6 @@ void loop() {
   robot.refresh();
 }
 
-//void loop() {
-//  robot.turnLeft();
-//  robot.refresh();
-//  delay(40);
-//  robot.refresh();
-//  
-//  Serial.println(robot.state());
-//  buzzer.playFrequency(440, 200, 15);
-//  delay(1000);
-//}
-
 void printProxSensorResults(uint16_t sensor[]) {
     Serial.print(sensor[0]);
     Serial.print(" ");
@@ -193,17 +176,19 @@ LineResult readLineSensorSimple() {
   lineSensors.read(lineSensorValues);
   updateMovingAvg(lineSensorValues);
 
-//  Serial.print("Values: ");
-//  for (int i = 0; i < NUM_SENSORS; i++) {
-//    Serial.print(lineSensorValues[i]);
-//    Serial.print(" ");
-//  }
-//  Serial.print(" avg: ");
-//  for (int i = 0; i < NUM_SENSORS; i++) {
-//    Serial.print(lineSensorValuesAvg[i] / MOVING_AVG);
-//    Serial.print(" ");
-//  }
-//  Serial.println("");
+  if (PRINT_LINE_SENSOR_DATA) {
+    Serial.print("Values: ");
+    for (int i = 0; i < NUM_SENSORS; i++) {
+      Serial.print(lineSensorValues[i]);
+      Serial.print(" ");
+    }
+    Serial.print(" avg: ");
+    for (int i = 0; i < NUM_SENSORS; i++) {
+      Serial.print(lineSensorValuesAvg[i] / MOVING_AVG);
+      Serial.print(" ");
+    }
+    Serial.println("");
+  }
 
   bool leftHit = lineSensorHit(0);
   bool centerHit = lineSensorHit(1);
@@ -252,10 +237,12 @@ ProxResult readProxSensorsSimple() {
 
   int diffFrontSignal = sumLeftLED[1] - sumRightLED[1]; 
 
-//  Serial.print("Left: ");
-//  printProxSensorResults(sumLeftLED);
-//  Serial.print(" Right: ");
-//  printProxSensorResults(sumRightLED);
+  if (PRINT_PROX_SENSOR_DATA) {
+    Serial.print("Left: ");
+    printProxSensorResults(sumLeftLED);
+    Serial.print(" Right: ");
+    printProxSensorResults(sumRightLED);
+  }
   
   // 90% 1/4
   // 80% 1/2 means (roughly) midcircle
@@ -265,16 +252,16 @@ ProxResult readProxSensorsSimple() {
 
   if (sumLeftLED[1] >= strongSignal && sumRightLED[1] >= strongSignal) {
       return AheadQuarter;
-  } else if (sumRightLED[2] >= modSignal) {
-    return Right;
-  } else if (sumLeftLED[0] >= modSignal) {
-    return Left;
-  } else if (sumLeftLED[1] >= modSignal && sumRightLED[1] >= modSignal && abs(diffFrontSignal) < weakSignal) {
-      return AheadHalf;
   } else if (diffFrontSignal > weakSignal) {
     return NudgeLeft;
   } else if (diffFrontSignal < -weakSignal) {
     return NudgeRight;
+  } else if (sumRightLED[2] >= weakSignal) {
+    return Right;
+  } else if (sumLeftLED[0] >= weakSignal) {
+    return Left;
+  } else if (sumLeftLED[1] >= modSignal && sumRightLED[1] >= modSignal && abs(diffFrontSignal) < weakSignal) {
+    return AheadHalf;
   } else if (sumLeftLED[1] >= weakSignal && sumRightLED[1] >= weakSignal) {
     return AheadFull;
   }

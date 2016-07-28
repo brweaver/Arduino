@@ -2,6 +2,9 @@
 #include <Wire.h>
 #include <Zumo32U4.h>
 
+Robot::Robot() {
+  randomSeed(millis());
+}
 void Robot::resetDefaultDelay() {
   stateInitTime = micros();
   stateDelayTime = Robot::defaultDelay;
@@ -10,15 +13,15 @@ void Robot::resetDelay(int delay) {
   stateInitTime = micros();
   stateDelayTime = Robot::defaultDelay;
 }
-
 Robot::RobotState Robot::state() {
   return currentState;
 }
+bool Robot::randomBool() {
+  int r = random(0,100);
+  return r % 2 == 0;
+}
 
 void Robot::refresh() {
-
-  Serial.print(currentState);
-  Serial.print("  ");
   
   // Check Delay 
   if (currentState != rs_deadstop) {
@@ -33,20 +36,16 @@ void Robot::refresh() {
     }
   }
   
-  Serial.print(" ");
-  Serial.println(currentState);
-  
   switch (currentState) {
     case rs_forward:
       motors.setSpeeds(speed, speed);
-      //motors.setRightSpeed(speed);
       break;
     case rs_nudgeleft: 
       motors.setLeftSpeed(speed);
-      motors.setRightSpeed(speed/2);
+      motors.setRightSpeed(speed * NUDGE_REDUCTION);
       break;
     case rs_nudgeright:
-      motors.setLeftSpeed(speed/2);
+      motors.setLeftSpeed(speed * NUDGE_REDUCTION);
       motors.setRightSpeed(speed);
       break;
     case rs_turnleft:
@@ -61,9 +60,7 @@ void Robot::refresh() {
       motors.setLeftSpeed(0);
       motors.setRightSpeed(0);
       break;
-  }
-
-  
+  }  
 }
 
 void Robot::forward() {
@@ -98,27 +95,26 @@ void Robot::deadStop() {
   currentState = rs_deadstop;
 }
 
-// blocking 
+// Maneuvers are blocking--no sensor input or state will be  
+// will be examined until the maneuver has completed. 
+
 void Robot::taanabManeuver() {
-  int dir = random(0,1);
-  if (dir == 0) {
+  if (randomBool()) {
     motors.setLeftSpeed(-speed);
-    motors.setRightSpeed(-speed/2);
-    turnRight(TURN_DELAY_90);
+    motors.setRightSpeed(-speed*NUDGE_REDUCTION);
   } else {
     motors.setRightSpeed(-speed);
-    motors.setLeftSpeed(-speed/2);
-    turnLeft(TURN_DELAY_90);
+    motors.setLeftSpeed(-speed*NUDGE_REDUCTION);
   }
-  delay(200);
+  delay(450); // Whoa!
+  forward();
 }
 
 void Robot::backupManeuver() {
   motors.setLeftSpeed(-speed);
   motors.setRightSpeed(-speed);
   delay(80); // note, this is actually dangerous!!!
-  int dir = random(0,1);
-  if (dir == 0) {
+  if (randomBool()) {
     turnLeft(Robot::TURN_DELAY_180);
   } else {
     turnRight(Robot::TURN_DELAY_180);
