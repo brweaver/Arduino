@@ -48,10 +48,8 @@ void setup() {
   
   // Delay 5-seconds!
   delay(5000);
-
-//  robot.forward();
   
-  robot.taanabManeuver();
+//  robot.taanabManeuver();
 }
 
 void loop() {
@@ -60,6 +58,11 @@ void loop() {
   ProxResult proxResult = readProxSensorsSimple();  
   switch (proxResult) {
     case Confused:
+      lcd.clear();
+      lcd.gotoXY(0, 1);
+      lcd.print("Confused");
+      robot.forward();
+      break;
     case Nothing:
     default:
       lcd.clear();
@@ -250,16 +253,16 @@ ProxResult readProxSensorsSimple() {
   // 40% means 3/4 
   // 20% means (roughly) full circle
 
-  if (sumLeftLED[1] >= strongSignal && sumRightLED[1] >= strongSignal) {
-      return AheadQuarter;
-  } else if (diffFrontSignal > weakSignal) {
-    return NudgeLeft;
-  } else if (diffFrontSignal < -weakSignal) {
-    return NudgeRight;
+  if (sumLeftLED[1] >= modSignal && sumRightLED[1] >= modSignal) {
+      return AheadFull;
   } else if (sumRightLED[2] >= weakSignal) {
     return Right;
   } else if (sumLeftLED[0] >= weakSignal) {
     return Left;
+  } else if (diffFrontSignal > weakSignal) {
+    return NudgeLeft;
+  } else if (diffFrontSignal < -weakSignal) {
+    return NudgeRight;
   } else if (sumLeftLED[1] >= modSignal && sumRightLED[1] >= modSignal && abs(diffFrontSignal) < weakSignal) {
     return AheadHalf;
   } else if (sumLeftLED[1] >= weakSignal && sumRightLED[1] >= weakSignal) {

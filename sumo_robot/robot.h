@@ -9,7 +9,7 @@
 
     
  class Robot {
-     enum RobotState {
+     public: enum RobotState {
       rs_forward,
       rs_backward,
       rs_ramming,
@@ -23,9 +23,9 @@
   public:
     Robot();
 
-    static const unsigned long TURN_DELAY_90 = 200; //160?
+    static const unsigned long TURN_DELAY_90 = 250; //160?
     static const unsigned long TURN_DELAY_180 = 400;
-    static constexpr float NUDGE_REDUCTION = 0.5;
+    static constexpr float NUDGE_REDUCTION = 0.33;
 
     RobotState currentState;
     

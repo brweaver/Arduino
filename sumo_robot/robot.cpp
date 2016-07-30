@@ -68,16 +68,14 @@ void Robot::forward() {
   resetDefaultDelay();
 }
 void Robot::turnLeft() {
-  currentState = rs_turnleft;
-  resetDefaultDelay();
+  turnLeft(80);
 }
 void Robot::turnLeft(unsigned long delay) {
   currentState = rs_turnleft;
   resetDelay(delay);
 }
 void Robot::turnRight() {
-  currentState = rs_turnright;
-  resetDefaultDelay();
+  turnRight(80);
 }
 void Robot::turnRight(unsigned long delay) {
   currentState = rs_turnright;
