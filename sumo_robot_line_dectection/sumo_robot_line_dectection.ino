@@ -61,11 +61,7 @@ void setup() {
   lineSensors.initThreeSensors();
   buzzer.play(">g32>>c32");
 
-  lcd.clear();
-  lcd.print(F("Press A"));
-  lcd.gotoXY(0, 1);
-  buttonA.waitForButton();
-  lcd.clear();
+  waitForButtonA();
 
   setupCompassGyro();
 
