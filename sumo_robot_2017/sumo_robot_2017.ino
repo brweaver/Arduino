@@ -27,14 +27,44 @@ void setup() {
   //dance01();
   
   //testEncoderConstantsForwardMovement();
-  testEncoderConstantsTurn();
+  //testEncoderConstantsTurn();
   //testLineDetectionSensor();
   //testLineDetectionWithMovement();
 }
 
 void loop() {
-  strategyTestBackAndForth();
   robot.refresh();
+  strategyTestBackAndForth();
+}
+
+void strategyTestBackAndForth() {
+  if (!robot.isMoving()) {
+    robot.setTargetDistance(1000); // mm
+    robot.forward();
+  }
+  if (robot.hasBorderContact(2)) {
+    robot.deadStop();
+    //robot.printline("contact");
+    ledYellow(1);
+    int angle = robot.estimateBorderTangent();
+    int adjAngle = 180 - angle;
+    //robot.printline(String(angle));
+    if (robot.lineSensorValue(0) > robot.lineSensorValue(4)) {
+      robot.danceTurn(-adjAngle);
+    } else {
+      robot.danceTurn(adjAngle);
+    }
+    ledYellow(0);
+    robot.deadStop();
+    //robot.waitForButtonA();
+    robot.refresh(); // get new line sensor data
+    if (robot.hasBorderContact(1)) {
+      // TODO!! Fail Safe!
+      ledRed(1);
+      delay(1000);
+      ledRed(0);
+    }
+  }
 }
 
 void systemCheck() {
@@ -67,10 +97,10 @@ void systemCheck() {
 void dance01() {
   robot.play(CANT_STOP_THE_FEELING);
   robot.danceTurn(-10);
-  robot.danceTurn(10);
-  robot.danceTurn(-10);
-  robot.danceTurn(10);
-  robot.danceTurn(-10);
+  robot.danceTurn(20);
+  robot.danceTurn(-20);
+  robot.danceTurn(20);
+  robot.danceTurn(-20);
   robot.danceTurn(10);
   robot.danceForward(10, 100);
   delay(100);
@@ -80,7 +110,7 @@ void dance01() {
   delay(100);
   robot.danceForward(10, 400);
   delay(100);
-  robot.turn(180);
+  robot.danceTurn(180);
   robot.danceForward(10, 100);
   delay(100);
   robot.danceForward(10, 200);
@@ -89,10 +119,6 @@ void dance01() {
   delay(100);
   robot.danceForward(10, 400);
   delay(100);
-}
-
-void strategyTestBackAndForth() {
-  
 }
 
 void testLineDetectionSensor() {
@@ -115,21 +141,33 @@ void testLineDetectionSensor() {
 
 void testLineDetectionWithMovement() {
   
-  robot.setTargetDistance(200); // MM
+  robot.setTargetDistance(400); // MM
   robot.forward();
   robot.printline("...");
-  
+  int angle; 
   do {
     robot.refresh();
     if (robot.hasBorderContact(2)) {
       robot.deadStop();
+      angle = robot.estimateBorderTangent();
       robot.printline("contact");
       break;
     }
   } while (robot.isMoving());
   
-  //robot.waitForButtonA();
-  //delay(2000);
+  robot.waitForButtonA();
+  delay(1000);
+
+  int adjAngle = 180 - angle;
+  Serial.print("adj angle: ");
+  Serial.println(adjAngle);
+  if (robot.lineSensorValue(0) > robot.lineSensorValue(4)) {
+    robot.danceTurn(-adjAngle);
+  } else {
+    robot.danceTurn(adjAngle);
+  }
+
+  robot.waitForButtonA();
   
   // black test: (all values should be black)
   // white test: (all values should be white)
@@ -195,6 +233,20 @@ void testEncoderConstantsForwardMovement() {
 }
 
 void testEncoderConstantsTurn() {
+
+  // Expected Result: Robot turns exactly 180 degrees to the right
+  robot.printline("R180*");
+  robot.turn(180);
+  refreshLoop(); 
+  robot.waitForButtonA();
+  delay(2000);
+
+    // Expected Result: Robot turns exactly 180 degrees to the right
+  robot.printline("R180*");
+  robot.turn(-180);
+  refreshLoop(); 
+  robot.waitForButtonA();
+  delay(2000);
   
   // Expected Result: Robot turns exactly 90 degrees to the right
   robot.printline("R90*");

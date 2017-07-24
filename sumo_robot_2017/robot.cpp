@@ -150,8 +150,6 @@ void Robot::refresh() {
       //      motors.setRightSpeed(0);
       break;
   }
-
-
 }
 
 void Robot::stopIfEncoderTargetReached() {
@@ -179,22 +177,26 @@ void Robot::stopIfEncoderTargetReached() {
       rightCheck = true;
     }
 
-    if (leftCheck) motors.setLeftSpeed(0);
-    if (rightCheck) motors.setRightSpeed(0);
     if (leftCheck && rightCheck) {
       Serial.print("deadstop\n");
       deadStop();
+    } else {
+      if (rightCheck) motors.setRightSpeed(0);
+      if (leftCheck) motors.setLeftSpeed(0);
     }
+
   }
 }
 
 void Robot::forward() {
   currentState = rs_forward;
+  //setEncoderCountTarget(1000,1000);
   //setEncoderCountTarget(Robot::defaultRevolutions, Robot::defaultRevolutions);
 }
 
 void Robot::deadStop() {
   currentState = rs_deadstop;
+  motors.setSpeeds(0, 0); // Just do it now!
 }
 
 void Robot::turn(int degrees) {
@@ -209,7 +211,7 @@ void Robot::turn(int degrees) {
   }
 
   // Note that negative degrees will result in negative rev
-  // which works out exactly as we want. 
+  // which works out exactly as we want.
   setEncoderCountTarget(rev, -rev);
 }
 
@@ -305,7 +307,8 @@ void Robot::resetEncoders() {
 void Robot::readLineSensors() {
   lineSensors.read(lineSensorValues);
   //updateLineSensorMovingAvg(lineSensorValues);
-
+  unsigned long now = millis();
+  int16_t avgEncoderCount = getAvgEncoderCount();
   if (PRINT_LINE_SENSOR_DATA) {
     Serial.print("Values: ");
     for (int i = 0; i < NUM_LINE_SENSORS; i++) {
@@ -317,15 +320,25 @@ void Robot::readLineSensors() {
       Serial.print(lineSensorValuesAvg[i] / LINE_SENSOR_MOVING_AVG);
       Serial.print(" ");
     }
-    Serial.println("");
+    Serial.print("  Encoder:");
+    Serial.print(avgEncoderCount);
+    Serial.print("  Timestamp:");
+    Serial.println(now);
   }
 
   // Update last hit across all sensors
   for (int i = 0; i < NUM_LINE_SENSORS; i++) {
-    if (lineSensorHit(i)) {
-      lineSensorHitTimestamp[i] = millis();
+    if (lineSensorHit(i) && now - lineSensorHitTimestamp[i] > LINE_SENSOR_HIT_WAIT) {
+      lineSensorHitEncoderCount[i] = avgEncoderCount;
+      lineSensorHitTimestamp[i] = now;
     }
   }
+}
+
+int16_t Robot::getAvgEncoderCount() {
+  int16_t left = encoders.getCountsLeft();
+  int16_t right = encoders.getCountsRight();
+  return (left + right) / 2;
 }
 
 bool Robot::lineSensorHit(int sensorIndex) {
@@ -342,6 +355,7 @@ int Robot::lineSensorValue(int sensorIndex) {
 bool Robot::hasBorderContact(int requiredSensorCount) {
   int count = 0;
   for (int i = 0; i < NUM_LINE_SENSORS; i++) {
+    if (i == 2) continue; // middle one causes problems...
     if (lineSensorHit(i)) ++count;
     if (count >= requiredSensorCount) return true;
   }
@@ -350,32 +364,81 @@ bool Robot::hasBorderContact(int requiredSensorCount) {
 
 int Robot::estimateBorderTangent() {
 
+  int16_t currentEncoderCount = getAvgEncoderCount();
+
+  unsigned long youngestTime = 0;
+  unsigned long oldestTime = millis();
+
   int indexOldest = -1;
   int indexYoungest = -1;
 
   for (int i = 0; i < NUM_LINE_SENSORS; i++) {
+    if (i == 2) continue; // middle one causes problems...
     if (lineSensorHit(i)) {
-      if (lineSensorHitTimestamp[i] < indexOldest) {
-        indexYoungest = indexOldest;
+      if (lineSensorHitTimestamp[i] <= oldestTime) {
         indexOldest = i;
-      } else if (lineSensorHitTimestamp[i] < indexYoungest) {
+        oldestTime = lineSensorHitTimestamp[i];
+      }
+
+      if (lineSensorHitTimestamp[i] > youngestTime) {
         indexYoungest = i;
+        youngestTime = lineSensorHitTimestamp[i];
       }
     }
   }
 
-  if (indexYoungest == -1)  {
+  if (PRINT_LINE_SENSOR_DATA) {
+    Serial.print("indexes selected: ");
+    Serial.print(indexOldest);
+    Serial.print(",");
+    Serial.print(indexYoungest);
+    Serial.print("\n");
+  }
+
+
+  if (indexYoungest == -1 || indexOldest == -1)  {
     // Not enough data to make calcualtion.
     return -1;
   }
 
-  float adj = (lineSensorHitTimestamp[indexOldest] - lineSensorHitTimestamp[indexYoungest]) * mmPerMS;
-  float opp = mmLineDistance[indexOldest][indexYoungest];
+  //float adj = (lineSensorHitTimestamp[indexOldest] - lineSensorHitTimestamp[indexYoungest]) * mmPerMS;
+  int16_t estCountDistance = lineSensorHitEncoderCount[indexYoungest] - lineSensorHitEncoderCount[indexOldest];
+  unsigned long timeDelta = lineSensorHitTimestamp[indexYoungest] - lineSensorHitTimestamp[indexOldest];
+
+  printline(String(timeDelta));
+  float adj = (float)estCountDistance / (float)countPerMM;
+  float opp = (float)mmLineDistance[indexOldest][indexYoungest];
 
   float rad = atan2(adj, opp);
-  return (int)(rad * 57.2957795); //rad * 57296 / 1000
+  int angle = (int)radiansToDegrees(rad); //(rad * 57.2957795); //rad * 57296 / 1000
+
+  if (PRINT_LINE_SENSOR_DATA) {
+    Serial.print("angle: ");
+    Serial.println(angle);
+    Serial.print("adj: ");
+    Serial.println(adj);
+    Serial.print("opp: ");
+    Serial.println(opp);
+    Serial.print("Encoder counts (1st/2nd): ");
+    Serial.print(lineSensorHitEncoderCount[indexOldest]);
+    Serial.print(",");
+    Serial.print(lineSensorHitEncoderCount[indexYoungest]);
+    Serial.print(" delta: ");
+    Serial.println(estCountDistance);
+    Serial.print("Timestamp (1st/2nd): ");
+    Serial.print(lineSensorHitTimestamp[indexOldest]);
+    Serial.print(",");
+    Serial.print(lineSensorHitTimestamp[indexYoungest]);
+    Serial.print(" delta: ");
+    Serial.println(timeDelta);
+  }
+
+  return angle;
 }
 
+float Robot::radiansToDegrees(float radians) {
+  return (radians * 180) / 3.14159267;
+}
 
 void Robot::updateLineSensorMovingAvg(unsigned int *values) {
   unsigned int i;
@@ -513,7 +576,7 @@ void Robot::waitForButtonA() {
 void Robot::delayUntilEncoderTargetReached() {
   while (isMoving()) {
     stopIfEncoderTargetReached();
-    delay(200);
+    //delay(200);
   }
 }
 
@@ -523,15 +586,30 @@ void Robot::danceForward(int mm, int speed) {
   motors.setSpeeds(speed, speed);
   delayUntilEncoderTargetReached();
 }
-//void Robot::danceForward(int mmLeft, mmRight, int speed) {
-//
-//}
+
+void Robot::danceBackward(int mm, int speed) {
+  setTargetDistance(-mm);
+  currentState = rs_forward;
+  motors.setSpeeds(-speed, -speed);
+  delayUntilEncoderTargetReached();
+}
+
 void Robot::danceTurn(int degrees) {
   turn(degrees);
   refresh();
   delayUntilEncoderTargetReached();
 }
 void Robot::danceShimmy(int delay) {
-
+  unsigned long now = millis();
+  motors.setSpeeds(200, -200);
+  delay(125);
+  while (millis() - now < delay) {
+    motors.setSpeeds(-200, 200);
+    delay(250);
+    motors.setSpeeds(200, -200);
+    delay(250);
+  }
+  motors.setSpeeds(-200, 200);
+  delay(125);
 }
 
