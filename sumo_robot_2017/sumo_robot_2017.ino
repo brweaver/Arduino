@@ -6,24 +6,131 @@
 // The robot class wraps all the underlying hardware on the robot. 
 Robot robot;
 
+char const* CANT_STOP_THE_FEELING = "T130O5MSL8E4.C<ACC<A2CCDEDCDEDCC<A2EDCEG4.GEDDC16<A2CCDEDCDEDCC<A2O4MSL8GG.A4>CA>C16A>CA.GA>CA16>CA16>C>E4.GA>CA>C16A>CA.GA>C4.";
+// 2) O4MSL8E2C<ACC<A2CCDEDCDEDCC<A2EDCEG4.GEDDC16<A2CCDEDCDEDCC<A2
+// 1) O5MSL8DDC16DMLE4R2O4MSC16D4D4D4D4O5DDC16DMLE4D2O4MSC16D4D4D4D4C16A<C
+// Can't stop"O5MSL8DDC16DMLE4R2O4MSC16D4D4D4D4O5DDC16DMLE4D2"
+// transition O4MSC16D4D4D4D4C16A<C
+
 void setup() {
 
+
+  //systemCheck();
+  
   robot.waitForButtonA();
   robot.play(">g32>>c32");
   
   // Delay 5-seconds!
-  robot.printline("5sec...");
-  delay(5000);
+  robot.printline("2sec...");
+  delay(2000);
 
+  //dance01();
+  
   //testEncoderConstantsForwardMovement();
   testEncoderConstantsTurn();
+  //testLineDetectionSensor();
+  //testLineDetectionWithMovement();
 }
 
 void loop() {
+  strategyTestBackAndForth();
   robot.refresh();
 }
 
-void exerciseLineDetection() {
+void systemCheck() {
+  
+  Zumo32U4Motors motors;
+  Zumo32U4Encoders encoders;
+  ledRed(1);
+  delay(1000);
+  encoders.getCountsAndResetLeft();
+  encoders.getCountsAndResetRight();
+  motors.setSpeeds(-200, 200);
+  int16_t left;
+  int16_t right;
+
+  do {
+    left = encoders.getCountsLeft();
+    right = encoders.getCountsRight();
+    Serial.print("Left: ");
+    Serial.print(left);
+    Serial.print("  Right: ");
+    Serial.print(right);
+    Serial.print("\n");
+    
+  } while (left > 100 || right < 100);
+  motors.setSpeeds(0,0);
+  
+}
+
+
+void dance01() {
+  robot.play(CANT_STOP_THE_FEELING);
+  robot.danceTurn(-10);
+  robot.danceTurn(10);
+  robot.danceTurn(-10);
+  robot.danceTurn(10);
+  robot.danceTurn(-10);
+  robot.danceTurn(10);
+  robot.danceForward(10, 100);
+  delay(100);
+  robot.danceForward(10, 200);
+  delay(100);
+  robot.danceForward(10, 300);
+  delay(100);
+  robot.danceForward(10, 400);
+  delay(100);
+  robot.turn(180);
+  robot.danceForward(10, 100);
+  delay(100);
+  robot.danceForward(10, 200);
+  delay(100);
+  robot.danceForward(10, 300);
+  delay(100);
+  robot.danceForward(10, 400);
+  delay(100);
+}
+
+void strategyTestBackAndForth() {
+  
+}
+
+void testLineDetectionSensor() {
+
+  long t = millis();
+  while (true) {
+    
+    if (millis() - t > 500) {
+      //String str = robot.lineSensorValue(0);
+      if (robot.hasBorderContact(2)) {
+        robot.printline("contact!");
+      } else {
+        robot.printline("...");
+      }
+      t = millis();
+    }
+    robot.refresh();
+  }
+}
+
+void testLineDetectionWithMovement() {
+  
+  robot.setTargetDistance(200); // MM
+  robot.forward();
+  robot.printline("...");
+  
+  do {
+    robot.refresh();
+    if (robot.hasBorderContact(2)) {
+      robot.deadStop();
+      robot.printline("contact");
+      break;
+    }
+  } while (robot.isMoving());
+  
+  //robot.waitForButtonA();
+  //delay(2000);
+  
   // black test: (all values should be black)
   // white test: (all values should be white)
   // angle test: robot moves forward until two sensors hit; angle calculated. 

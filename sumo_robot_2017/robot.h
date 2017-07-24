@@ -9,6 +9,7 @@
 #define PRINT_LINE_SENSOR_DATA false
 #define PRINT_PROX_SENSOR_DATA false
 #define PRINT_ENCODER_DATA true
+#define PRINT_MOTOR_DATA true
 
 #define LINE_SENSOR_MOVING_AVG 10
 #define LINE_SENSOR_THRESHOLD 500
@@ -68,6 +69,12 @@ class Robot {
     bool isMoving();
     void waitForButtonA();
 
+    // These are all instant, blocking moves. 
+    void danceForward(int mm, int speed);
+    //void danceForward(int mmLeft, mmRight);
+    void danceTurn(int degrees);
+    void danceShimmy(int delay);
+
 //    void registerFrontLineHit();
 //    void registerLeftLineHit();
 //    void registerRightLineHit();
@@ -82,6 +89,9 @@ class Robot {
 
     void printline(String str);
     void play(char const* str);
+
+    bool hasBorderContact(int requiredSensorCount);
+    int lineSensorValue(int sensorIndex);
     
     RobotState state();
     
@@ -91,14 +101,17 @@ class Robot {
     //void resetDelay(int);
     bool randomBool();
     
-    void setEncoderCountTarget(int targetLeftCount, int targetRightCount);
-    long degreesToRevolutions(int degrees);
+    void setEncoderCountTarget(int16_t targetLeftCount, int16_t targetRightCount);
+    long degreesToCounts(int degrees);
     void resetEncoders();
+    void stopIfEncoderTargetReached();
+    void delayUntilEncoderTargetReached();
 
     void readLineSensors();
     void updateLineSensorMovingAvg(unsigned int *values);
     bool lineSensorHit(int sensorIndex);
-    bool hasBorderContact(int requiredSensorCount);
+    
+
     int estimateBorderTangent();
 
     static const uint16_t maxSpeed = 1024;
@@ -135,8 +148,8 @@ class Robot {
 //    unsigned long stateInitTime;
 //    unsigned long stateDelayTime;
 
-    unsigned long leftEncoderCount;
-    unsigned long rightEncoderCount; 
+    int16_t leftEncoderCount;
+    int16_t rightEncoderCount; 
     
 // Depricated in favor of modelling
 //    unsigned long lastLeftLineHit; 
