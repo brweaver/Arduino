@@ -23,13 +23,14 @@ void setup() {
   // Delay 5-seconds!
   robot.printline("2sec...");
   delay(2000);
-
+  //robot.danceShimmy(2000);
   //dance01();
   
   //testEncoderConstantsForwardMovement();
   //testEncoderConstantsTurn();
   //testLineDetectionSensor();
   //testLineDetectionWithMovement();
+  //testProxDetectionSensor();
 }
 
 void loop() {
@@ -37,11 +38,24 @@ void loop() {
   strategyTestBackAndForth();
 }
 
+void testProxDetectionSensor() {
+  
+  //long t = millis();
+  while (true) {
+    
+    int value = robot.readProxSensorsSimple();
+    delay(100);
+    //robot.refresh();
+  }
+  
+}
+
 void strategyTestBackAndForth() {
   if (!robot.isMoving()) {
     robot.setTargetDistance(1000); // mm
     robot.forward();
   }
+      
   if (robot.hasBorderContact(2)) {
     robot.deadStop();
     //robot.printline("contact");
@@ -49,10 +63,13 @@ void strategyTestBackAndForth() {
     int angle = robot.estimateBorderTangent();
     int adjAngle = 180 - angle;
     //robot.printline(String(angle));
+    //robot.silientWaitForButtonA();
     if (robot.lineSensorValue(0) > robot.lineSensorValue(4)) {
       robot.danceTurn(-adjAngle);
+      Serial.print("Turn Right");
     } else {
       robot.danceTurn(adjAngle);
+      Serial.print("Turn Left");
     }
     ledYellow(0);
     robot.deadStop();
@@ -61,9 +78,18 @@ void strategyTestBackAndForth() {
     if (robot.hasBorderContact(1)) {
       // TODO!! Fail Safe!
       ledRed(1);
-      delay(1000);
+      //delay(1000);
       ledRed(0);
     }
+  }
+
+  int value = robot.readProxSensorsSimple();
+  if (value > 0) {
+    robot.veerLeft();
+  } else if (value < 0) {
+    robot.veerRight();
+  } else {
+    robot.veerForward();
   }
 }
 
@@ -150,13 +176,15 @@ void testLineDetectionWithMovement() {
     if (robot.hasBorderContact(2)) {
       robot.deadStop();
       angle = robot.estimateBorderTangent();
+      robot.silientWaitForButtonA();
+      delay(1000);
       robot.printline("contact");
       break;
     }
   } while (robot.isMoving());
   
-  robot.waitForButtonA();
-  delay(1000);
+//  robot.waitForButtonA();
+//  delay(1000);
 
   int adjAngle = 180 - angle;
   Serial.print("adj angle: ");

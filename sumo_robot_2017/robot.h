@@ -6,8 +6,8 @@
 // Note that 5 means some of the prox sensors are disabled. 
 #define NUM_LINE_SENSORS 5 
 
-#define PRINT_LINE_SENSOR_DATA true
-#define PRINT_PROX_SENSOR_DATA false
+#define PRINT_LINE_SENSOR_DATA false
+#define PRINT_PROX_SENSOR_DATA true
 #define PRINT_ENCODER_DATA false
 #define PRINT_MOTOR_DATA false
 
@@ -70,6 +70,12 @@ class Robot {
     void refresh();
     bool isMoving();
     void waitForButtonA();
+    void silientWaitForButtonA();
+    void veerLeft();
+    void veerRight();
+    void veerForward();
+    int readProxSensorsSimple();
+    void printProxSensorResults(uint16_t sensor[]);
 
     // These are all instant, blocking moves. 
     void danceForward(int mm, int speed);
@@ -96,6 +102,7 @@ class Robot {
     bool hasBorderContact(int requiredSensorCount);
     int lineSensorValue(int sensorIndex);
     int estimateBorderTangent();
+    
 
     RobotState state();
     
@@ -132,7 +139,10 @@ class Robot {
     Zumo32U4Buzzer buzzer;
     Zumo32U4LCD lcd;
 
-    int16_t speed = 400;
+    int16_t normalSpeed = 400;
+    int16_t forwardRightSpeed = 400;
+    int16_t forwardLeftSpeed = 400;
+    
     uint16_t brightnessLevels[IR_NUM_BRIGHTNESS_LEVELS];
     
     unsigned int lineSensorValues[NUM_LINE_SENSORS];

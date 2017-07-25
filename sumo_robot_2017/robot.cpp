@@ -121,7 +121,7 @@ void Robot::refresh() {
 
   switch (currentState) {
     case rs_forward:
-      motors.setSpeeds(speed, speed);
+      motors.setSpeeds(forwardLeftSpeed, forwardRightSpeed);
       //if (PRINT_MOTOR_DATA) Serial.println("Forward: " + speed + "," + speed);
       break;
     //    case rs_nudgeleft:
@@ -133,13 +133,13 @@ void Robot::refresh() {
     //      motors.setRightSpeed(speed);
     //      break;
     case rs_turnleft:
-      motors.setSpeeds(-speed, speed);
+      motors.setSpeeds(-normalSpeed, normalSpeed);
       //if (PRINT_MOTOR_DATA) Serial.println(("Left: " + -speed + "," + speed));
       //motors.setLeftSpeed(-speed);
       //motors.setRightSpeed(speed);
       break;
     case rs_turnright:
-      motors.setSpeeds(speed, -speed);
+      motors.setSpeeds(normalSpeed, -normalSpeed);
       //if (PRINT_MOTOR_DATA) Serial.println(("Right: " + speed + "," + speed));
       //motors.setLeftSpeed(speed);
       //motors.setRightSpeed(-speed);
@@ -152,6 +152,21 @@ void Robot::refresh() {
   }
 }
 
+void Robot::veerLeft() {
+  forwardLeftSpeed = normalSpeed * NUDGE_REDUCTION;
+  forwardRightSpeed = normalSpeed;
+}
+
+void Robot::veerRight() {
+  forwardLeftSpeed = normalSpeed;
+  forwardRightSpeed = normalSpeed * NUDGE_REDUCTION;
+}
+
+void Robot::veerForward() {
+  forwardLeftSpeed = normalSpeed;
+  forwardRightSpeed = normalSpeed;
+}
+    
 void Robot::stopIfEncoderTargetReached() {
   if (currentState != rs_deadstop) {
 
@@ -405,13 +420,14 @@ int Robot::estimateBorderTangent() {
   int16_t estCountDistance = lineSensorHitEncoderCount[indexYoungest] - lineSensorHitEncoderCount[indexOldest];
   unsigned long timeDelta = lineSensorHitTimestamp[indexYoungest] - lineSensorHitTimestamp[indexOldest];
 
-  printline(String(timeDelta));
   float adj = (float)estCountDistance / (float)countPerMM;
   float opp = (float)mmLineDistance[indexOldest][indexYoungest];
 
   float rad = atan2(adj, opp);
   int angle = (int)radiansToDegrees(rad); //(rad * 57.2957795); //rad * 57296 / 1000
 
+  printline(String(angle));
+  
   if (PRINT_LINE_SENSOR_DATA) {
     Serial.print("angle: ");
     Serial.println(angle);
@@ -459,17 +475,88 @@ void Robot::updateLineSensorMovingAvg(unsigned int *values) {
 // ---------------------------------------------------------
 // PROXIMITY SENSORS
 // ---------------------------------------------------------
-// todo
+int MIN_PROX_DIFFERENCE = 1;
+int MIN_PROX_THRESHOLD = 6;
+ int Robot::readProxSensorsSimple() {
 
-/*
+  proxSensors.read();
 
-  void printProxSensorResults(uint16_t sensor[]) {
+  uint16_t sumLeftLED[] = {
+    proxSensors.countsLeftWithLeftLeds(),
+    proxSensors.countsFrontWithLeftLeds(),
+    proxSensors.countsRightWithLeftLeds()};
+  uint16_t sumRightLED[] = {
+    proxSensors.countsLeftWithRightLeds(),
+    proxSensors.countsFrontWithRightLeds(),
+    proxSensors.countsRightWithRightLeds()};
+
+  int diffFrontSignal = sumLeftLED[1] - sumRightLED[1];
+
+  if (PRINT_PROX_SENSOR_DATA) {
+    Serial.print("Left: ");
+    printProxSensorResults(sumLeftLED);
+    Serial.print(" Right: ");
+    printProxSensorResults(sumRightLED);
+    Serial.print("\n");
+  }
+
+  
+  if (sumLeftLED[1] <= MIN_PROX_THRESHOLD && sumRightLED[1] < MIN_PROX_THRESHOLD) {
+    Serial.println("...below prox threshold");
+    return 0;
+  }
+  
+  if (sumLeftLED[1] > sumRightLED[1] + MIN_PROX_DIFFERENCE) {
+    Serial.println("Left!");
+    return 1;
+  } else if (sumLeftLED[1] < sumRightLED[1] - MIN_PROX_DIFFERENCE) { 
+    Serial.println("Right!");
+    return -1;
+  } 
+  
+  Serial.println("Forward!");
+  return 0;
+
+  
+
+  // 90% 1/4
+  // 80% 1/2 means (roughly) midcircle
+  // 70% 1/2
+  // 40% means 3/4
+  // 20% means (roughly) full circle
+
+//  if (!robot.hasRecentFrontLineHit() && sumLeftLED[1] >= modSignal && sumRightLED[1] >= modSignal) {
+//      return AheadFar;
+//  } else if (sumRightLED[2] >= modSignal && !robot.hasRecentRightLineHit()) {
+//    return Right;
+//  } else if (sumLeftLED[0] >= modSignal && !robot.hasRecentLeftLineHit()) {
+//    return Left;
+//  } else if (diffFrontSignal > weakSignal) {
+//    return AheadLeft;
+//  } else if (diffFrontSignal < -weakSignal) {
+//    return AheadRight;
+//  } else if (sumLeftLED[1] >= modSignal && sumRightLED[1] >= modSignal && abs(diffFrontSignal) < weakSignal) {
+//    return Ahead;
+//  } else if (sumLeftLED[1] >= weakSignal && sumRightLED[1] >= weakSignal) {
+//    return AheadFar;
+//  }
+//
+//  return Confused;
+  }
+
+  void Robot::printProxSensorResults(uint16_t sensor[]) {
     Serial.print(sensor[0]);
     Serial.print(" ");
     Serial.print(sensor[1]);
     Serial.print(" ");
     Serial.print(sensor[2]);
   }
+
+// todo
+
+/*
+
+
 
   String proxResultToString(ProxResult r) {
   switch(r) {
@@ -573,6 +660,10 @@ void Robot::waitForButtonA() {
   lcd.clear();
 }
 
+void Robot::silientWaitForButtonA() {
+  buttonA.waitForButton();
+}
+
 void Robot::delayUntilEncoderTargetReached() {
   while (isMoving()) {
     stopIfEncoderTargetReached();
@@ -599,11 +690,11 @@ void Robot::danceTurn(int degrees) {
   refresh();
   delayUntilEncoderTargetReached();
 }
-void Robot::danceShimmy(int delay) {
+void Robot::danceShimmy(int timeMS) {
   unsigned long now = millis();
   motors.setSpeeds(200, -200);
   delay(125);
-  while (millis() - now < delay) {
+  while (millis() - now < timeMS) {
     motors.setSpeeds(-200, 200);
     delay(250);
     motors.setSpeeds(200, -200);
